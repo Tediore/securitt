@@ -1,0 +1,3 @@
+*.py
+!securitt.py
+__pycache__

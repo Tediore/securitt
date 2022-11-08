@@ -1,0 +1,50 @@
+logging:
+  log_level: info # Minimum log level.
+  retain_days: 7 # Days of logging history to retain.
+
+mqtt:
+  host: localhost
+  port: 1883
+  user: user
+  password: pass
+  qos: 1
+  base_topic: securitt # Base topic of the securitt instance. Defaults to securitt.
+  z2m_topic: zigbee2mqtt # Base topic of your zigbee2mqtt instance.
+
+panel:
+  codes:
+    1111: Burt Macklin # Code number and user name.
+    2222: Janet Snakehole
+  armed_home: &home
+    # Each parameter here is in seconds
+    entry_delay: 0
+    exit_delay: 0
+    alarm_time: 30 # Length of time to sound the alarm when triggered.
+  armed_night: *home
+  armed_away:
+    entry_delay: 30
+    exit_delay: 30
+    alarm_time: 300
+
+keypads: # List containing the friendly names of each keypad in zigbee2mqtt
+- 'Front door keypad'
+- 'Side door keypad'
+
+sirens: # List containing the friendly names of each siren in zigbee2mqtt
+- 'Siren'
+
+sensors:
+- name: 'Back door' # Required. Friendly name of sensor in zigbee2mqtt.
+  active: 'always' # Required. List of one or more of ['armed_home', 'armed_away', 'armed_night'] or 'always'. Always means in all armed modes.
+  type: 'contact' # Required. Must be one of ['contact', 'motion'].
+  instant: True # Optional. Set to True if the sensor should trigger the alarm immediately regardless of the alarm mode entry delay. Defaults to False.
+- name: 'Front door' 
+  active: 'always' 
+  type: 'contact' 
+- name: 'Side door'
+  active: 'always'
+  type: 'contact'
+- name: 'Living room motion'
+  active: 'armed_away'
+  type: 'motion'
+  instant: True
