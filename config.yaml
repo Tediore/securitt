@@ -30,6 +30,19 @@ keypads: # List containing the friendly names of each keypad in zigbee2mqtt
 - 'Front door keypad'
 - 'Side door keypad'
 
+keyfobs:
+- name: "Burt's key fob" # Required. Friendly name of key fob in zigbee2mqtt.
+  enabled: True # Required. Set to True if key fob should be enabled or False if not.
+  modes: # Required. Determines which buttons should are allowed to be used. List of one or more of ['armed_home', 'armed_away', 'armed_night'].
+  - 'armed_away'
+  - 'disarmed'
+
+- name: "Janet's key fob"
+  enabled: True
+  modes:
+  - 'armed_away'
+  - 'disarmed'
+
 sirens: # List containing the friendly names of each siren in zigbee2mqtt
 - 'Siren'
 

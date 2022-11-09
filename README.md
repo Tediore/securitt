@@ -4,6 +4,9 @@
 **Configuration**
 See config.yaml for an example config file with all configuration options and comments explaining most options.
 
+**Reloading configuration without restart**
+You can reload all configuration options (except MQTT settings and log level) without restarting by publishing a blank payload to `base_topic`/reload_config
+
 **Docker-compose**
 Example docker-compose.yaml service entry:
 ```yaml

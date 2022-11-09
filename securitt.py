@@ -13,18 +13,25 @@ class Alarm:
         self.ha_commands = {'disarm': 'disarm', 'arm_home': 'arm_day_zones', 'arm_night': 'arm_night_zones', 'arm_away': 'arm_all_zones'}
         self.sensors = {}
         self.sensor_list = []
+        self.keyfobs = {}
+        self.keyfob_list = []
 
     def load_config(self, reload=False):
         with open('/app/data/config.yaml', 'r') as config_file:
             config = yaml.safe_load(config_file)
             mqtt = config['mqtt']
             sensors = config['sensors']
+            keyfobs = config['keyfobs']
             self.panel_settings = config['panel']
             self.codes = self.panel_settings['codes']
             self.keypads = config['keypads']
             self.sirens = config['sirens']
             self.z2m_topic = mqtt['z2m_topic']
             self.log_settings = config['logging']
+            if 'notify' in config.keys():
+                notify = config['notify']
+                self.gotify_key = notify['gotify_key']
+                self.phone_numbers = notify['phone_numbers']
         config_file.close()
 
         for sensor in sensors:
@@ -38,6 +45,15 @@ class Alarm:
             self.sensors[name]['instant'] = instant
             self.sensor_list.append(name)
 
+        for fob in keyfobs:
+            fob_name = fob['name']
+            fob_enabled = fob['enabled']
+            fob_modes = fob['modes']
+            self.keyfobs[fob_name] = {}
+            self.keyfobs[fob_name]['enabled'] = fob_enabled
+            self.keyfobs[fob_name]['modes'] = fob_modes
+            self.keyfob_list.append(fob_name)
+
         if not reload:
             self.mqtt_host = mqtt['host'] if 'host' in mqtt else None
             self.mqtt_port = mqtt['port'] if 'port' in mqtt else 1883
@@ -47,10 +63,10 @@ class Alarm:
             self.base_topic = mqtt['base_topic'] if 'base_topic' in mqtt else 'securitty'
             self.log_level = self.log_settings['log_level'].upper() if 'log_level' in self.log_settings else 'INFO'
 
-    def keypad_input(self, action, keypad, code):
-        """ Process input from alarm keypads """
+    def keypad_input(self, action, device, code):
+        """ Process input from alarm keypads and key fobs """
         if action in ['disarm', 'arm_day_zones', 'arm_night_zones', 'arm_all_zones']:
-            self.set_mode(action, code, keypad)
+            self.set_mode(action, code, device)
 
     def sensor_state_change(self, sensor, payload):
         """ Process monitored sensor state changes """
@@ -88,13 +104,17 @@ class Alarm:
             else:
                 self.entry_delay(alarm_state)
 
-    def set_mode(self, action, code, keypad=None):
+    def set_mode(self, action, code, device=None):
         code_list = self.codes
-        user = code_list[int(code)]
         alarm_state = self.alarm_state
 
+        if code != 'fob':
+            user = code_list[int(code)]
+        else:
+            user = device
+
         if action != 'disarm':
-            self.exit_delay(action, keypad, user)
+            self.exit_delay(action, device, user)
 
         elif action == 'disarm':
             if alarm_state == 'triggered':
@@ -246,6 +266,8 @@ def on_connect(client, userdata, flags, rc):
         client.subscribe(f'{a.z2m_topic}/{sensor}')
     for keypad in a.keypads:
         client.subscribe(f'{a.z2m_topic}/{keypad}')
+    for fob in a.keyfob_list:
+        client.subscribe(f'{a.z2m_topic}/{fob}')
 
 def on_message(client, userdata, msg):
     topic = str(msg.topic)
@@ -256,17 +278,31 @@ def on_message(client, userdata, msg):
         # if monitored sensor changes state
         if device in a.sensor_list: 
             a.sensor_state_change(device, payload)
+
+        # if an action is carried out with a key fob
+        elif device in a.keyfob_list:
+            enabled = a.keyfobs[device]['enabled']
+            action = payload['action']
+            if action not in [None, 'null', '']:
+                if enabled:
+                    allowed_mode = a.modes[action] in a.keyfobs[device]['modes']
+                    if allowed_mode:
+                        a.keypad_input(action, device, 'fob')
+                    else:
+                        logger.warning(f"Received command '{action}' from device '{device}', but {action} is not enabled for {device}")
+                else:
+                    logger.warning(f"Received command '{action}' from device '{device}', but {device} is not enabled")
+                
         
-        # if an action is carried out on the keypad
+        # if an action is carried out on a keypad
         elif device in a.keypads:
-            keypad = device
             action = payload['action']
             code = payload['action_code']
             valid_codes = a.codes
             if code != None:
                 if int(code) in valid_codes.keys():
-                    a.keypad_input(action, keypad, code)
-                    logger.debug(f"Received command from keypad '{keypad}': {action}")
+                    a.keypad_input(action, device, code)
+                    logger.debug(f"Received command from keypad '{device}': {action}")
 
     # receive command from Home Assistant
     elif 'set_mode' in topic:
