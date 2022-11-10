@@ -9,12 +9,15 @@ import paho.mqtt.client as mqtt_client
 
 class Alarm:
     def __init__(self):
-        self.modes = {'disarm': 'disarmed', 'arm_day_zones': 'armed_home', 'arm_night_zones': 'armed_night', 'arm_all_zones': 'armed_away'}
+        self.modes = {'disarm': 'disarmed', 'disarmed': 'disarmed', 'arm_day_zones': 'armed_home', 'arm_night_zones': 'armed_night', 'arm_all_zones': 'armed_away'}
         self.ha_commands = {'disarm': 'disarm', 'arm_home': 'arm_day_zones', 'arm_night': 'arm_night_zones', 'arm_away': 'arm_all_zones'}
+        self.button_commands = {'disarmed': 'disarmed', 'armed_home': 'arm_day_zones', 'armed_night': 'arm_night_zones', 'arm_away': 'arm_all_zones'}
         self.sensors = {}
         self.sensor_list = []
         self.keyfobs = {}
         self.keyfob_list = []
+        self.buttons = {}
+        self.button_list = []
 
     def load_config(self, reload=False):
         with open('/app/data/config.yaml', 'r') as config_file:
@@ -22,6 +25,7 @@ class Alarm:
             mqtt = config['mqtt']
             sensors = config['sensors']
             keyfobs = config['keyfobs']
+            buttons = config['buttons']
             self.panel_settings = config['panel']
             self.codes = self.panel_settings['codes']
             self.keypads = config['keypads']
@@ -54,6 +58,15 @@ class Alarm:
             self.keyfobs[fob_name]['modes'] = fob_modes
             self.keyfob_list.append(fob_name)
 
+        for button in buttons:
+            button_name = button['name']
+            button_enabled = button['enabled']
+            button_actions = button['actions']
+            self.buttons[button_name] = {}
+            self.buttons[button_name]['enabled'] = button_enabled
+            self.buttons[button_name]['actions'] = button_actions
+            self.button_list.append(button_name)
+
         if not reload:
             self.mqtt_host = mqtt['host'] if 'host' in mqtt else None
             self.mqtt_port = mqtt['port'] if 'port' in mqtt else 1883
@@ -67,6 +80,9 @@ class Alarm:
         """ Process input from alarm keypads and key fobs """
         if action in ['disarm', 'arm_day_zones', 'arm_night_zones', 'arm_all_zones']:
             self.set_mode(action, code, device)
+
+    def button_input(self, action, device):
+        self.set_mode(action, False, device)
 
     def sensor_state_change(self, sensor, payload):
         """ Process monitored sensor state changes """
@@ -107,16 +123,18 @@ class Alarm:
     def set_mode(self, action, code, device=None):
         code_list = self.codes
         alarm_state = self.alarm_state
+        disarmed = ['disarm', 'disarmed']
 
-        if code != 'fob':
-            user = code_list[int(code)]
-        else:
+        if not code:
+            # if action is carried out with a key fob or a button
             user = device
+        else:
+            user = code_list[int(code)]
 
-        if action != 'disarm':
+        if action not in disarmed:
             self.exit_delay(action, device, user)
 
-        elif action == 'disarm':
+        elif action in disarmed:
             if alarm_state == 'triggered':
                 # if alarm is disarmed after being triggered
                 for siren in self.sirens:
@@ -261,16 +279,19 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe(f'{a.base_topic}/set_mode')
     client.subscribe(f'{a.base_topic}/reload_config')
 
-    # topics for receiving data from keypads and monitored sensors
+    # topics for receiving data from devices
     for sensor in a.sensor_list:
         client.subscribe(f'{a.z2m_topic}/{sensor}')
     for keypad in a.keypads:
         client.subscribe(f'{a.z2m_topic}/{keypad}')
     for fob in a.keyfob_list:
         client.subscribe(f'{a.z2m_topic}/{fob}')
+    for button in a.button_list:
+        client.subscribe(f'{a.z2m_topic}/{button}')
 
 def on_message(client, userdata, msg):
     topic = str(msg.topic)
+    ignored_actions = [None, 'null', '']
     if a.z2m_topic in topic:
         payload = json.loads(msg.payload.decode('utf-8'))
         device = topic.replace(f'{a.z2m_topic}/','')
@@ -279,21 +300,6 @@ def on_message(client, userdata, msg):
         if device in a.sensor_list: 
             a.sensor_state_change(device, payload)
 
-        # if an action is carried out with a key fob
-        elif device in a.keyfob_list:
-            enabled = a.keyfobs[device]['enabled']
-            action = payload['action']
-            if action not in [None, 'null', '']:
-                if enabled:
-                    allowed_mode = a.modes[action] in a.keyfobs[device]['modes']
-                    if allowed_mode:
-                        a.keypad_input(action, device, 'fob')
-                    else:
-                        logger.warning(f"Received command '{action}' from device '{device}', but {action} is not enabled for {device}")
-                else:
-                    logger.warning(f"Received command '{action}' from device '{device}', but {device} is not enabled")
-                
-        
         # if an action is carried out on a keypad
         elif device in a.keypads:
             action = payload['action']
@@ -303,6 +309,41 @@ def on_message(client, userdata, msg):
                 if int(code) in valid_codes.keys():
                     a.keypad_input(action, device, code)
                     logger.debug(f"Received command from keypad '{device}': {action}")
+
+        # if an action is carried out with a key fob
+        elif device in a.keyfob_list:
+            enabled = a.keyfobs[device]['enabled']
+            action = payload['action']
+            if action not in ignored_actions:
+                if enabled:
+                    allowed_mode = a.modes[action] in a.keyfobs[device]['modes']
+                    if allowed_mode:
+                        a.keypad_input(action, device, False)
+                    else:
+                        logger.warning(f"Received command '{action}' from device '{device}', but {action} is not enabled for {device}")
+                else:
+                    logger.warning(f"Received command '{action}' from device '{device}', but {device} is not enabled")
+
+        # if an action is carried out with a button
+        elif device in a.button_list:
+            enabled = a.buttons[device]['enabled']
+            action = payload['action']
+            single = ['on', 'off', 'single']
+            double = ['double']
+            if action not in ignored_actions:
+                if enabled:
+                    allowed_actions = action in a.buttons[device]['actions'].keys()
+                    if allowed_actions:
+                        if action in single:
+                            button_action = a.buttons[device]['actions']['single']
+                        elif action in double:
+                            button_action = a.buttons[device]['actions']['double']
+                        alarm_action = a.button_commands[button_action]
+                        a.button_input(alarm_action, device)
+                    else:
+                        logger.warning(f"Received command '{action}' from device '{device}', but {action} is not enabled for {device}")
+                else:
+                    logger.warning(f"Received command '{action}' from device '{device}', but {device} is not enabled")
 
     # receive command from Home Assistant
     elif 'set_mode' in topic:

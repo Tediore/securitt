@@ -1,6 +1,8 @@
 # securitt
 **securitt** is an MQTT-based security system meant to be used with zigbee2mqtt. It allows you to configure a security system in YAML that handles input from Zigbee keypads and key fobs (and Home Assistant, if desired) and also sound Zigbee sirens when the alarm is triggered. I created this solely because I thought it would be fun to write a security system from scratch. It was more fun than I thought it would be, surprisingly. I don't know if anyone would actually use this, but I wanted to share it anyway.
 
+Initial support for buttons has been added (single and double press only). YMMV with this.
+
 **Configuration**
 <br>
 See config.yaml for an example config file with all configuration options and comments explaining most options.
