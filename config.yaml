@@ -46,7 +46,7 @@ keyfobs:
 buttons:
 - name: 'Button' # Required. Friendly name of button in zigbee2mqtt.
   enabled: True # Required. Set to True if button should be enabled or False if not.
-  actions: # Required. Dictionary of button presses and the action they should carry out (one of ['disarm', 'armed_home', 'armed_away', 'armed_night'])
+  actions: # Required. Dictionary of button presses and the action they should carry out (one of ['disarmed', 'armed_home', 'armed_away', 'armed_night'])
   # Currently only supports single and double press.
     single: 'armed_home'
     double: 'disarmed'
