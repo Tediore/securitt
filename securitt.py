@@ -11,7 +11,7 @@ class Alarm:
     def __init__(self):
         self.modes = {'disarm': 'disarmed', 'disarmed': 'disarmed', 'arm_day_zones': 'armed_home', 'arm_night_zones': 'armed_night', 'arm_all_zones': 'armed_away'}
         self.ha_commands = {'disarm': 'disarm', 'arm_home': 'arm_day_zones', 'arm_night': 'arm_night_zones', 'arm_away': 'arm_all_zones'}
-        self.button_commands = {'disarmed': 'disarmed', 'armed_home': 'arm_day_zones', 'armed_night': 'arm_night_zones', 'arm_away': 'arm_all_zones'}
+        self.button_commands = {'disarmed': 'disarmed', 'armed_home': 'arm_day_zones', 'armed_night': 'arm_night_zones', 'armed_away': 'arm_all_zones'}
         self.sensors = {}
         self.sensor_list = []
         self.keyfobs = {}
