@@ -27,7 +27,7 @@ class Alarm:
             keyfobs = config['keyfobs'] if 'keyfobs' in config.keys() else []
             buttons = config['buttons'] if 'buttons' in config.keys() else []
             self.panel_settings = config['panel']
-            self.codes = self.panel_settings['codes'] if 'codes' in config.keys() else []
+            self.codes = self.panel_settings['codes'] if 'codes' in config['panel'].keys() else []
             self.keypads = config['keypads'] if 'keypads' in config.keys() else []
             self.sirens = config['sirens'] if 'sirens' in config.keys() else []
             self.z2m_topic = mqtt['z2m_topic']
