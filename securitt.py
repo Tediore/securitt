@@ -23,15 +23,17 @@ class Alarm:
         with open('/app/data/config.yaml', 'r') as config_file:
             config = yaml.safe_load(config_file)
             mqtt = config['mqtt']
-            sensors = config['sensors']
-            keyfobs = config['keyfobs']
-            buttons = config['buttons']
-            self.panel_settings = config['panel']
-            self.codes = self.panel_settings['codes']
-            self.keypads = config['keypads']
-            self.sirens = config['sirens']
             self.z2m_topic = mqtt['z2m_topic']
-            self.log_settings = config['logging']
+
+            sensors = config['sensors'] or {}
+            keyfobs = config['keyfobs'] or {}
+            buttons = config['buttons'] or {}
+            
+            self.panel_settings = config['panel'] or {}
+            self.codes = self.panel_settings['codes'] or {}
+            self.keypads = config['keypads'] or {}
+            self.sirens = config['sirens'] or {}
+            self.log_settings = config['logging'] or {}
             if 'notify' in config.keys():
                 notify = config['notify']
                 self.gotify_key = notify['gotify_key']
