@@ -23,15 +23,16 @@ class Alarm:
         with open('/app/data/config.yaml', 'r') as config_file:
             config = yaml.safe_load(config_file)
             mqtt = config['mqtt']
-            sensors = config['sensors']
-            keyfobs = config['keyfobs'] if 'keyfobs' in config else []
-            buttons = config['buttons'] if 'buttons' in config else []
+            sensors = config['sensors'] if 'sensors' in config.keys() else []
+            keyfobs = config['keyfobs'] if 'keyfobs' in config.keys() else []
+            buttons = config['buttons'] if 'buttons' in config.keys() else []
             self.panel_settings = config['panel']
-            self.codes = self.panel_settings['codes']
-            self.keypads = config['keypads'] if 'keypads' in config else []
-            self.sirens = config['sirens'] if 'sirens' in config else []
+            self.codes = self.panel_settings['codes'] if 'codes' in config.keys() else []
+            self.keypads = config['keypads'] if 'keypads' in config.keys() else []
+            self.sirens = config['sirens'] if 'sirens' in config.keys() else []
             self.z2m_topic = mqtt['z2m_topic']
-            self.log_settings = config['logging']
+            self.log_settings = config['logging'] if 'logging' in config.keys() else None
+            self.log_days = a.log_settings['retain_days'] if 'logging' in config.keys() else 7
             if 'notify' in config.keys():
                 notify = config['notify']
                 self.gotify_key = notify['gotify_key']
@@ -76,7 +77,7 @@ class Alarm:
             self.mqtt_pass = mqtt['password'] if 'password' in mqtt else None
             self.mqtt_qos = mqtt['qos'] if 'qos' in mqtt else 1
             self.base_topic = mqtt['base_topic'] if 'base_topic' in mqtt else 'securitty'
-            self.log_level = self.log_settings['log_level'].upper() if 'log_level' in self.log_settings else 'INFO'
+            self.log_level = self.log_settings['log_level'].upper() if 'logging' in config else 'INFO'
 
     def keypad_input(self, action, device, code):
         """ Process input from alarm keypads and key fobs """
@@ -159,9 +160,10 @@ class Alarm:
             self.alarm_disarmed(user)
 
         if action != 'arm_all_zones':
-            for pad in self.keypads:
-                # change keypad LEDs on alarm mode change
-                client.publish(f'{self.z2m_topic}/{pad}/set', json.dumps({'arm_mode': {'mode': action}}))
+            if self.keypads:
+                for pad in self.keypads:
+                    # change keypad LEDs on alarm mode change
+                    client.publish(f'{self.z2m_topic}/{pad}/set', json.dumps({'arm_mode': {'mode': action}}))
 
     def exit_delay(self, action, keypad, user):
         logger.info(f'Exit delay started by {user}')
@@ -376,10 +378,9 @@ if __name__ == '__main__':
     a.load_config()
 
     logger = logging.getLogger('log')
-    log_days = a.log_settings['retain_days']
-    handler = TimedRotatingFileHandler('/app/data/securitt.log', when="midnight", backupCount=log_days)
+    handler = TimedRotatingFileHandler('/app/data/securitt.log', when="midnight", backupCount=a.log_days)
 
-    if a.log_level.lower() not in ['debug', 'info', 'warning', 'error']:
+    if a.log_settings == None or a.log_level.lower() not in ['debug', 'info', 'warning', 'error']:
         logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s', handlers=(handler,))
     else:
         logging.basicConfig(level=a.log_level, format='%(asctime)s %(levelname)s: %(message)s', handlers=(handler,))
