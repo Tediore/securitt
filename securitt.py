@@ -24,12 +24,12 @@ class Alarm:
             config = yaml.safe_load(config_file)
             mqtt = config['mqtt']
             sensors = config['sensors']
-            keyfobs = config['keyfobs']
-            buttons = config['buttons']
+            keyfobs = config['keyfobs'] if 'keyfobs' in config else []
+            buttons = config['buttons'] if 'buttons' in config else []
             self.panel_settings = config['panel']
             self.codes = self.panel_settings['codes']
-            self.keypads = config['keypads']
-            self.sirens = config['sirens']
+            self.keypads = config['keypads'] if 'keypads' in config else []
+            self.sirens = config['sirens'] if 'sirens' in config else []
             self.z2m_topic = mqtt['z2m_topic']
             self.log_settings = config['logging']
             if 'notify' in config.keys():
@@ -49,23 +49,25 @@ class Alarm:
             self.sensors[name]['instant'] = instant
             self.sensor_list.append(name)
 
-        for fob in keyfobs:
-            fob_name = fob['name']
-            fob_enabled = fob['enabled']
-            fob_modes = fob['modes']
-            self.keyfobs[fob_name] = {}
-            self.keyfobs[fob_name]['enabled'] = fob_enabled
-            self.keyfobs[fob_name]['modes'] = fob_modes
-            self.keyfob_list.append(fob_name)
+        if keyfobs:
+            for fob in keyfobs:
+                fob_name = fob['name']
+                fob_enabled = fob['enabled']
+                fob_modes = fob['modes']
+                self.keyfobs[fob_name] = {}
+                self.keyfobs[fob_name]['enabled'] = fob_enabled
+                self.keyfobs[fob_name]['modes'] = fob_modes
+                self.keyfob_list.append(fob_name)
 
-        for button in buttons:
-            button_name = button['name']
-            button_enabled = button['enabled']
-            button_actions = button['actions']
-            self.buttons[button_name] = {}
-            self.buttons[button_name]['enabled'] = button_enabled
-            self.buttons[button_name]['actions'] = button_actions
-            self.button_list.append(button_name)
+        if buttons:
+            for button in buttons:
+                button_name = button['name']
+                button_enabled = button['enabled']
+                button_actions = button['actions']
+                self.buttons[button_name] = {}
+                self.buttons[button_name]['enabled'] = button_enabled
+                self.buttons[button_name]['actions'] = button_actions
+                self.button_list.append(button_name)
 
         if not reload:
             self.mqtt_host = mqtt['host'] if 'host' in mqtt else None
