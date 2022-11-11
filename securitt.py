@@ -298,14 +298,9 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe(f'{a.base_topic}/reload_config')
 
     # topics for receiving data from devices
-    for sensor in a.sensor_list:
-        client.subscribe(f'{a.z2m_topic}/{sensor}')
-    for keypad in a.keypads:
-        client.subscribe(f'{a.z2m_topic}/{keypad}')
-    for fob in a.keyfob_list:
-        client.subscribe(f'{a.z2m_topic}/{fob}')
-    for button in a.button_list:
-        client.subscribe(f'{a.z2m_topic}/{button}')
+    devices = a.sensor_list + a.keypads + a.keyfob_list + a.button_list
+    for device in devices:
+        client.subscribe(f'{a.z2m_topic}/{device}')
 
 def on_message(client, userdata, msg):
     topic = str(msg.topic)
