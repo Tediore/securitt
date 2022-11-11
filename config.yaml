@@ -1,8 +1,8 @@
-logging:
+logging: # Optional. Defaults shown below.
   log_level: info # Minimum log level.
   retain_days: 7 # Days of logging history to retain.
 
-mqtt:
+mqtt: # Required.
   host: localhost
   port: 1883
   user: user
@@ -11,7 +11,7 @@ mqtt:
   base_topic: securitt # Base topic of the securitt instance. Defaults to securitt.
   z2m_topic: zigbee2mqtt # Base topic of your zigbee2mqtt instance.
 
-panel:
+panel: # Required.
   codes:
     1111: Burt Macklin # Code number and user name.
     2222: Janet Snakehole
@@ -25,15 +25,18 @@ panel:
     entry_delay: 30
     exit_delay: 30
     alarm_time: 300
+  panic:
+    alarm_time: 300 # Length of time to sound the alarm is panic is triggered.
 
-keypads: # List containing the friendly names of each keypad in zigbee2mqtt
+keypads: # Optional. List containing the friendly names of each keypad in zigbee2mqtt.
 - 'Front door keypad'
 - 'Side door keypad'
 
-keyfobs:
+keyfobs: # Optional.
 - name: "Burt's key fob" # Required. Friendly name of key fob in zigbee2mqtt.
   enabled: True # Required. Set to True if key fob should be enabled or False if not.
-  modes: # Required. Determines which buttons should are allowed to be used. List of one or more of ['armed_home', 'armed_away', 'armed_night'].
+  modes: # Required. Determines which buttons should are allowed to be used. 
+  # List of one or more of ['disarmed', 'armed_home', 'armed_away', 'armed_night', 'panic'].
   - 'armed_away'
   - 'disarmed'
 
@@ -43,18 +46,18 @@ keyfobs:
   - 'armed_away'
   - 'disarmed'
 
-buttons:
+buttons: # Optional.
 - name: 'Button' # Required. Friendly name of button in zigbee2mqtt.
   enabled: True # Required. Set to True if button should be enabled or False if not.
-  actions: # Required. Dictionary of button presses and the action they should carry out (one of ['disarmed', 'armed_home', 'armed_away', 'armed_night'])
+  actions: # Required. Dictionary of button presses and the action they should carry out (one of ['disarmed', 'armed_home', 'armed_away', 'armed_night', 'panic'])
   # Currently only supports single and double press.
     single: 'armed_home'
     double: 'disarmed'
 
-sirens: # List containing the friendly names of each siren in zigbee2mqtt
+sirens: # Optional. List containing the friendly names of each siren in zigbee2mqtt.
 - 'Siren'
 
-sensors:
+sensors: # Required.
 - name: 'Back door' # Required. Friendly name of sensor in zigbee2mqtt.
   active: 'always' # Required. List of one or more of ['armed_home', 'armed_away', 'armed_night'] or 'always'. Always means in all armed modes.
   type: 'contact' # Required. Must be one of ['contact', 'motion'].

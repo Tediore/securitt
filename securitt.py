@@ -9,9 +9,28 @@ import paho.mqtt.client as mqtt_client
 
 class Alarm:
     def __init__(self):
-        self.modes = {'disarm': 'disarmed', 'disarmed': 'disarmed', 'arm_day_zones': 'armed_home', 'arm_night_zones': 'armed_night', 'arm_all_zones': 'armed_away'}
-        self.ha_commands = {'disarm': 'disarm', 'arm_home': 'arm_day_zones', 'arm_night': 'arm_night_zones', 'arm_away': 'arm_all_zones'}
-        self.button_commands = {'disarmed': 'disarmed', 'armed_home': 'arm_day_zones', 'armed_night': 'arm_night_zones', 'armed_away': 'arm_all_zones'}
+        self.modes = {
+            'disarm': 'disarmed', 
+            'disarmed': 'disarmed', 
+            'arm_day_zones': 'armed_home', 
+            'arm_night_zones': 'armed_night', 
+            'arm_all_zones': 'armed_away', 
+            'panic': 'panic'
+            }
+        self.ha_commands = {
+            'disarm': 'disarm', 
+            'arm_home': 'arm_day_zones', 
+            'arm_night': 'arm_night_zones', 
+            'arm_away': 'arm_all_zones', 
+            'panic': 'panic'
+            }
+        self.button_commands = {
+            'disarmed': 'disarmed', 
+            'armed_home': 'arm_day_zones', 
+            'armed_night': 'arm_night_zones', 
+            'armed_away': 'arm_all_zones', 
+            'panic': 'panic'
+            }
         self.sensors = {}
         self.sensor_list = []
         self.keyfobs = {}
@@ -50,25 +69,23 @@ class Alarm:
             self.sensors[name]['instant'] = instant
             self.sensor_list.append(name)
 
-        if keyfobs:
-            for fob in keyfobs:
-                fob_name = fob['name']
-                fob_enabled = fob['enabled']
-                fob_modes = fob['modes']
-                self.keyfobs[fob_name] = {}
-                self.keyfobs[fob_name]['enabled'] = fob_enabled
-                self.keyfobs[fob_name]['modes'] = fob_modes
-                self.keyfob_list.append(fob_name)
+        for fob in keyfobs:
+            fob_name = fob['name']
+            fob_enabled = fob['enabled']
+            fob_modes = fob['modes']
+            self.keyfobs[fob_name] = {}
+            self.keyfobs[fob_name]['enabled'] = fob_enabled
+            self.keyfobs[fob_name]['modes'] = fob_modes
+            self.keyfob_list.append(fob_name)
 
-        if buttons:
-            for button in buttons:
-                button_name = button['name']
-                button_enabled = button['enabled']
-                button_actions = button['actions']
-                self.buttons[button_name] = {}
-                self.buttons[button_name]['enabled'] = button_enabled
-                self.buttons[button_name]['actions'] = button_actions
-                self.button_list.append(button_name)
+        for button in buttons:
+            button_name = button['name']
+            button_enabled = button['enabled']
+            button_actions = button['actions']
+            self.buttons[button_name] = {}
+            self.buttons[button_name]['enabled'] = button_enabled
+            self.buttons[button_name]['actions'] = button_actions
+            self.button_list.append(button_name)
 
         if not reload:
             self.mqtt_host = mqtt['host'] if 'host' in mqtt else None
@@ -76,16 +93,13 @@ class Alarm:
             self.mqtt_user = mqtt['user'] if 'user' in mqtt else None
             self.mqtt_pass = mqtt['password'] if 'password' in mqtt else None
             self.mqtt_qos = mqtt['qos'] if 'qos' in mqtt else 1
-            self.base_topic = mqtt['base_topic'] if 'base_topic' in mqtt else 'securitty'
+            self.base_topic = mqtt['base_topic'] if 'base_topic' in mqtt else 'securitt'
             self.log_level = self.log_settings['log_level'].upper() if 'logging' in config else 'INFO'
 
-    def keypad_input(self, action, device, code):
+    def device_input(self, action, device, code):
         """ Process input from alarm keypads and key fobs """
-        if action in ['disarm', 'arm_day_zones', 'arm_night_zones', 'arm_all_zones']:
+        if action in ['disarm', 'disarmed', 'arm_day_zones', 'arm_night_zones', 'arm_all_zones', 'panic']:
             self.set_mode(action, code, device)
-
-    def button_input(self, action, device):
-        self.set_mode(action, False, device)
 
     def sensor_state_change(self, sensor, payload):
         """ Process monitored sensor state changes """
@@ -311,7 +325,7 @@ def on_message(client, userdata, msg):
             valid_codes = a.codes
             if code != None:
                 if int(code) in valid_codes.keys():
-                    a.keypad_input(action, device, code)
+                    a.device_input(action, device, code)
                     logger.debug(f"Received command from keypad '{device}': {action}")
 
         # if an action is carried out with a key fob
@@ -322,7 +336,7 @@ def on_message(client, userdata, msg):
                 if enabled:
                     allowed_mode = a.modes[action] in a.keyfobs[device]['modes']
                     if allowed_mode:
-                        a.keypad_input(action, device, False)
+                        a.device_input(action, device, False)
                     else:
                         logger.warning(f"Received command '{action}' from device '{device}', but {action} is not enabled for {device}")
                 else:
@@ -343,7 +357,7 @@ def on_message(client, userdata, msg):
                         elif action in double:
                             button_action = a.buttons[device]['actions']['double']
                         alarm_action = a.button_commands[button_action]
-                        a.button_input(alarm_action, device)
+                        a.device_input(alarm_action, device, False)
                     else:
                         logger.warning(f"Received command '{action}' from device '{device}', but {action} is not enabled for {device}")
                 else:
