@@ -59,14 +59,17 @@ class Alarm:
         config_file.close()
 
         for sensor in sensors:
+            keys = sensor.keys()
             name = sensor['name']
             type = sensor['type']
-            instant = sensor['instant'] if 'instant' in sensor else False
             active = sensor['active']
+            instant = sensor['instant'] if 'instant' in keys else False
+            tamper = sensor['tamper'] if 'tamper' in keys else False
             self.sensors[name] = {}
             self.sensors[name]['type'] = type
             self.sensors[name]['active'] = active
             self.sensors[name]['instant'] = instant
+            self.sensors[name]['tamper'] = tamper
             self.sensor_list.append(name)
 
         for fob in keyfobs:
@@ -105,19 +108,27 @@ class Alarm:
         """ Process monitored sensor state changes """
         sensor_type = self.sensors[sensor]['type']
         alarm_state = self.alarm_state
+        tampered = False
 
-        if sensor_type == 'contact':
-            state = payload['contact']
-            sensor_on = True if not state else False # contact attribute in payload is True for closed and False for open. We reverse that here.
-            description = 'opened' if sensor_on else 'closed'
+        if 'tamper' in payload.keys():
+            if a.sensors[sensor]['tamper']: # if tamper switch is monitored on sensor
+                tampered = payload['tamper']
+                if tampered:
+                    self.check_if_sensor_active(sensor, description='tampered')
 
-        elif sensor_type == 'motion':
-            state = payload['occupancy']
-            sensor_on = True if state else False # occupancy attribute in payload is True for motion detected and False for motion cleared
-            description = 'detected' if sensor_on else 'cleared'
+        if not tampered:
+            if sensor_type == 'contact':
+                state = payload['contact']
+                sensor_on = True if not state else False # contact attribute in payload is True for closed and False for open. We reverse that here.
+                description = 'opened' if sensor_on else 'closed'
 
-        if sensor_on and alarm_state != 'disarmed':
-            self.check_if_sensor_active(sensor, description)
+            elif sensor_type == 'motion':
+                state = payload['occupancy']
+                sensor_on = True if state else False # occupancy attribute in payload is True for motion detected and False for motion cleared
+                description = 'detected' if sensor_on else 'cleared'
+
+            if sensor_on and alarm_state != 'disarmed':
+                self.check_if_sensor_active(sensor, description)
 
     def check_if_sensor_active(self, sensor, description):
         """ Check if sensor is active in current alarm mode """
@@ -131,11 +142,11 @@ class Alarm:
                 active = True
 
         if active:
-            self.trigger_sensor = sensor
-            if instant:
-                self.alarm_triggered(alarm_state)
+            if instant or description == 'tampered':
+                tamper = True if description == 'tampered' else False
+                self.alarm_triggered(alarm_state, sensor, tamper)
             else:
-                self.entry_delay(alarm_state)
+                self.entry_delay(alarm_state, sensor)
 
     def set_mode(self, action, code, device=None):
         code_list = self.codes
@@ -182,6 +193,7 @@ class Alarm:
     def exit_delay(self, action, keypad, user):
         mode = self.modes[action]
         exit_delay = self.panel_settings[mode]['exit_delay']
+        self.prev_alarm_state = self.alarm_state
 
         if not exit_delay:
             # Bypass exit delay if exit delay is zero
@@ -189,7 +201,6 @@ class Alarm:
             self.arm_alarm(mode, user)
         else:
             logger.info(f'Exit delay started by {user}')
-            self.prev_alarm_state = self.alarm_state
             self.alarm_state = 'arming'
             self.save_alarm_state()
 
@@ -200,19 +211,24 @@ class Alarm:
             exit_delay_timer = self.exit_delay_timer
             exit_delay_timer.start()
 
-    def entry_delay(self, state):
-        logger.debug(f'{self.trigger_sensor} tripped')
-
-        self.prev_alarm_state = self.alarm_state
-        self.alarm_state = 'pending'
+    def entry_delay(self, state, sensor):
         entry_delay = self.panel_settings[state]['entry_delay']
-        self.save_alarm_state()
+        self.prev_alarm_state = self.alarm_state
 
-        self.entry_delay_timer = threading.Timer(entry_delay, self.alarm_triggered, args=(state,))
-        entry_delay_timer = self.entry_delay_timer
-        entry_delay_timer.start()
+        if not entry_delay:
+            # Bypass entry delay if entry delay is zero
+            logger.debug(f'Bypassing entry delay because entry delay for {state} is zero.')
+            self.alarm_triggered(state, sensor)
+        else:
+            self.alarm_state = 'pending'
+            self.save_alarm_state()
 
-        logger.info('Entry delay started')
+            self.entry_delay_timer = threading.Timer(entry_delay, self.alarm_triggered, args=(state, sensor))
+            entry_delay_timer = self.entry_delay_timer
+            entry_delay_timer.start()
+
+            logger.debug(f'{sensor} tripped')
+            logger.info('Entry delay started')
 
     def alarm_mode_changed(self, user):
         self.save_alarm_state()
@@ -231,8 +247,9 @@ class Alarm:
         self.alarm_state = 'disarmed'
         self.alarm_mode_changed(user)
 
-    def alarm_triggered(self, state):
-        logger.info(f'Alarm triggered by {self.trigger_sensor}!')
+    def alarm_triggered(self, state, sensor, tamper=False):
+        suffix = ' tampering' if tamper else ''
+        logger.info(f'Alarm triggered by {sensor}{suffix}!')
 
         self.alarm_state = 'triggered'
         self.save_alarm_state()
@@ -295,6 +312,11 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg):
     topic = str(msg.topic)
+    msg = msg
+    process_message(topic, msg)
+
+def process_message(topic, msg):
+    """ Process MQTT messages sent to subscribed topics """
     ignored_actions = [None, 'null', '']
     if a.z2m_topic in topic:
         payload = json.loads(msg.payload.decode('utf-8'))

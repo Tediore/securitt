@@ -62,6 +62,7 @@ sensors: # Required.
   active: 'always' # Required. List of one or more of ['armed_home', 'armed_away', 'armed_night'] or 'always'. Always means in all armed modes.
   type: 'contact' # Required. Must be one of ['contact', 'motion'].
   instant: True # Optional. Set to True if the sensor should trigger the alarm immediately regardless of the alarm mode entry delay. Defaults to False.
+  tamper: True # Optional. Set to True if the sensor's tamper switch should immediately trigger the alarm if tripped when the alarm is armed. Defaults to False.
 - name: 'Front door' 
   active: 'always' 
   type: 'contact' 
