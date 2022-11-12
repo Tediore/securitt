@@ -171,7 +171,7 @@ class Alarm:
                 entry_delay_timer.cancel()
                 logger.info(f'Entry delay canceled by {user}')
 
-            self.alarm_disarmed(user)
+            self.disarm_alarm(user)
 
         if action != 'arm_all_zones':
             if self.keypads:
@@ -180,25 +180,25 @@ class Alarm:
                     client.publish(f'{self.z2m_topic}/{pad}/set', json.dumps({'arm_mode': {'mode': action}}))
 
     def exit_delay(self, action, keypad, user):
-        logger.info(f'Exit delay started by {user}')
         mode = self.modes[action]
         exit_delay = self.panel_settings[mode]['exit_delay']
-        self.prev_alarm_state = self.alarm_state
-        self.alarm_state = 'arming'
-        self.save_alarm_state()
 
-        timers = {
-            'armed_away': threading.Timer(exit_delay, self.alarm_arm_away, args=(user,)),
-            'armed_home': threading.Timer(exit_delay, self.alarm_arm_home, args=(user,)),
-            'armed_night': threading.Timer(exit_delay, self.alarm_arm_night, args=(user,))
-        }
+        if not exit_delay:
+            # Bypass exit delay if exit delay is zero
+            logger.debug(f'Bypassing exit delay because exit delay for {mode} is zero.')
+            self.arm_alarm(mode, user)
+        else:
+            logger.info(f'Exit delay started by {user}')
+            self.prev_alarm_state = self.alarm_state
+            self.alarm_state = 'arming'
+            self.save_alarm_state()
 
-        if keypad != None and action == 'arm_all_zones':
-            client.publish(f'{self.z2m_topic}/{keypad}/set', json.dumps({'arm_mode': {'mode': 'arming_away'}}))
+            if keypad != None and action == 'arm_all_zones':
+                client.publish(f'{self.z2m_topic}/{keypad}/set', json.dumps({'arm_mode': {'mode': 'arming_away'}}))
 
-        self.exit_delay_timer = timers[mode]
-        exit_delay_timer = self.exit_delay_timer
-        exit_delay_timer.start()
+            self.exit_delay_timer = threading.Timer(exit_delay, self.arm_alarm, args=(mode, user))
+            exit_delay_timer = self.exit_delay_timer
+            exit_delay_timer.start()
 
     def entry_delay(self, state):
         logger.debug(f'{self.trigger_sensor} tripped')
@@ -218,24 +218,15 @@ class Alarm:
         self.save_alarm_state()
         logger.info(f'Alarm state changed to {self.alarm_state} by {user}')
 
-    def alarm_arm_away(self, user):
+    def arm_alarm(self, mode, user):
         self.prev_alarm_state = self.alarm_state
-        self.alarm_state = 'armed_away'
-        for pad in self.keypads:
-            client.publish(f'{self.z2m_topic}/{pad}/set', json.dumps({'arm_mode': {'mode': 'arm_all_zones'}}))
+        self.alarm_state = mode
+        if mode == 'armed_away':
+            for pad in self.keypads:
+                client.publish(f'{self.z2m_topic}/{pad}/set', json.dumps({'arm_mode': {'mode': 'arm_all_zones'}}))
         self.alarm_mode_changed(user)
 
-    def alarm_arm_home(self, user):
-        self.prev_alarm_state = self.alarm_state
-        self.alarm_state = 'armed_home'
-        self.alarm_mode_changed(user)
-
-    def alarm_arm_night(self, user):
-        self.prev_alarm_state = self.alarm_state
-        self.alarm_state = 'armed_night'
-        self.alarm_mode_changed(user)
-
-    def alarm_disarmed(self, user):
+    def disarm_alarm(self, user):
         self.prev_alarm_state = self.alarm_state
         self.alarm_state = 'disarmed'
         self.alarm_mode_changed(user)
